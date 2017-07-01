@@ -1,12 +1,30 @@
-CC = c99
+CC = gcc
 CFLAGS = -Wall -O2
-
-# LIB = -lpthread
+CONFIG_DIR=~/.config/tinyserver
+BINFILE=/usr/local/bin/tinyserver
 
 all: tiny
 
 tiny: tiny.c
-	$(CC) $(CFLAGS) -o tiny tiny.c $(LIB)
+	install -d $(CONFIG_DIR)
+	install -d $(CONFIG_DIR)/cache
+	install -m 664 dir.template.html $(CONFIG_DIR)/dir.template.html
+	$(CC) $(CFLAGS) -o tiny *.c
+	sudo install -m 775 tiny $(BINFILE)
+
+check:
+	rm -f *.o tiny *~
+	$(CC) $(CFLAGS) -o tiny *.c
 
 clean:
 	rm -f *.o tiny *~
+	rm -rf $(CONFIG_DIR)
+
+install:
+	make clean
+	make all
+
+uninstall:
+	make clean
+	sudo rm -rf $(BINFILE)
+

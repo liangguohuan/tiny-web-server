@@ -1,4 +1,4 @@
-#include <arpa/inet.h>          /* inet_ntoa */
+#include <arpa/inet.h>
 #include <signal.h>
 #include <dirent.h>
 #include <errno.h>
@@ -14,11 +14,31 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include "functions.h"
 
+
+/*--------------------------------------------------------------------------
+| Disabled warning: implicit-function-declaration
+|---------------------------------------------------------------------------
+| As we all know
+| function calls need to be declared first and then called in C.
+*/
+DIR *fdopendir(int fd);
+int openat(int dirfd, const char *pathname, int flags, ...);
+
+/*--------------------------------------------------------------------------
+| macro define
+|---------------------------------------------------------------------------
+*/
 #define LISTENQ  1024  /* second argument to listen() */
 #define MAXLINE 1024   /* max length of a line */
 #define RIO_BUFSIZE 1024
+#define HOME getenv("HOME")
 
+/*--------------------------------------------------------------------------
+| struct define
+|---------------------------------------------------------------------------
+*/
 typedef struct {
     int rio_fd;                 /* descriptor for this buf */
     int rio_cnt;                /* unread byte in this buf */
@@ -30,6 +50,9 @@ typedef struct {
 typedef struct sockaddr SA;
 
 typedef struct {
+    int refresh;
+    char *host;
+    char *cache_control;
     char filename[512];
     off_t offset;              /* for support Range */
     size_t end;
@@ -39,6 +62,18 @@ typedef struct {
     const char *extension;
     const char *mime_type;
 } mime_map;
+
+void rio_readinitb(rio_t *rp, int fd){
+    rp->rio_fd = fd;
+    rp->rio_cnt = 0;
+    rp->rio_bufptr = rp->rio_buf;
+}
+
+/*--------------------------------------------------------------------------
+| global variable
+|---------------------------------------------------------------------------
+*/
+char *ROOT;
 
 mime_map meme_types [] = {
     {".css", "text/css"},
@@ -59,12 +94,10 @@ mime_map meme_types [] = {
 
 char *default_mime_type = "text/plain";
 
-void rio_readinitb(rio_t *rp, int fd){
-    rp->rio_fd = fd;
-    rp->rio_cnt = 0;
-    rp->rio_bufptr = rp->rio_buf;
-}
-
+/*--------------------------------------------------------------------------
+| functions
+|---------------------------------------------------------------------------
+*/
 ssize_t writen(int fd, void *usrbuf, size_t n){
     size_t nleft = n;
     ssize_t nwritten;
@@ -143,33 +176,36 @@ ssize_t rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen){
     return n;
 }
 
-void format_size(char* buf, struct stat *stat){
-    if(S_ISDIR(stat->st_mode)){
-        sprintf(buf, "%s", "[DIR]");
-    } else {
-        off_t size = stat->st_size;
-        if(size < 1024){
-            sprintf(buf, "%lu", size);
-        } else if (size < 1024 * 1024){
-            sprintf(buf, "%.1fK", (double)size / 1024);
-        } else if (size < 1024 * 1024 * 1024){
-            sprintf(buf, "%.1fM", (double)size / 1024 / 1024);
-        } else {
-            sprintf(buf, "%.1fG", (double)size / 1024 / 1024 / 1024);
-        }
-    }
-}
+void handle_directory_request(int out_fd, int dir_fd, http_request *req){
 
-void handle_directory_request(int out_fd, int dir_fd, char *filename){
+    char cachename[255], cachename_encode[255], cachefile[255], templatefile[50];
+
+    sprintf(cachename, "%s/%s", ROOT, req->filename);
+    url_encode(cachename_encode, cachename);
+
+    sprintf(cachefile, "%s/.config/tinyserver/cache/%s", HOME, cachename_encode);
+    sprintf(templatefile, "%s/.config/tinyserver/%s", HOME, "dir.template.html");
+
+    mlog(1, "cachefile: %s", cachefile);
+    mlog(1, "templatefile: %s", templatefile);
+
     char buf[MAXLINE], m_time[32], size[16];
     struct stat statbuf;
-    sprintf(buf, "HTTP/1.1 200 OK\r\n%s%s%s%s%s",
-            "Content-Type: text/html\r\n\r\n",
-            "<html><head><style>",
-            "body{font-family: monospace; font-size: 13px;}",
-            "td {padding: 1.5px 6px;}",
-            "</style></head><body><table>\n");
+    sprintf(buf, "HTTP/1.1 200 OK\r\n%s",
+            "Content-Type: text/html\r\n\r\n");
     writen(out_fd, buf, strlen(buf));
+
+    // read from cache
+    if (req->refresh == 0 && file_exists(cachefile)) {
+        char *cache = read_file(cachefile);
+        writen(out_fd, cache, strlen(cache));
+        mlog(1, "%s", "[CACHE] load cache file.");
+        return ;
+    }
+
+    long t1 = now();
+    // Read dir
+    char *data = "";
     DIR *d = fdopendir(dir_fd);
     struct dirent *dp;
     int ffd;
@@ -187,14 +223,31 @@ void handle_directory_request(int out_fd, int dir_fd, char *filename){
         format_size(size, &statbuf);
         if(S_ISREG(statbuf.st_mode) || S_ISDIR(statbuf.st_mode)){
             char *d = S_ISDIR(statbuf.st_mode) ? "/" : "";
-            sprintf(buf, "<tr><td><a href=\"%s%s\">%s%s</a></td><td>%s</td><td>%s</td></tr>\n",
-                    dp->d_name, d, dp->d_name, d, m_time, size);
-            writen(out_fd, buf, strlen(buf));
+            char *dattr = S_ISDIR(statbuf.st_mode) ? "data-dir" : "data-file";
+            sprintf(buf, "[\"<a %s href=\\\"%s%s\\\">%s%s</a>\", \"%s\", \"%s\", \"%ld\"],",
+                    dattr, dp->d_name, d, dp->d_name, d, m_time, size, (long)statbuf.st_size);
+            data = join(data, buf);
         }
         close(ffd);
     }
-    sprintf(buf, "</table></body></html>");
-    writen(out_fd, buf, strlen(buf));
+
+    // Read dir template file
+    char *content = read_file(templatefile);
+    content = str_replace(content, "{{data}}", data);
+    writen(out_fd, content, strlen(content));
+
+    long t2 = now();
+
+    // write cache file if overtime
+    if (t2 - t1 > 3) {
+        write_file(cachefile, content, "w");
+        mlog(1, "%s", "[CACHE] write cachefile.");
+    }
+
+    // free resource
+    free(data);
+    free(content);
+
     closedir(d);
 }
 
@@ -247,38 +300,38 @@ int open_listenfd(int port){
     return listenfd;
 }
 
-void url_decode(char* src, char* dest, int max) {
-    char *p = src;
-    char code[3] = { 0 };
-    while(*p && --max) {
-        if(*p == '%') {
-            memcpy(code, ++p, 2);
-            *dest++ = (char)strtoul(code, NULL, 16);
-            p += 2;
-        } else {
-            *dest++ = *p++;
-        }
-    }
-    *dest = '\0';
-}
-
 void parse_request(int fd, http_request *req){
     rio_t rio;
-    char buf[MAXLINE], method[MAXLINE], uri[MAXLINE];
+    char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], cache_control[10], host[100];
     req->offset = 0;
     req->end = 0;              /* default */
+    req->refresh = 0;
 
     rio_readinitb(&rio, fd);
     rio_readlineb(&rio, buf, MAXLINE);
+    // mlog(2, "[REQUEST] %s", buf);
     sscanf(buf, "%s %s", method, uri); /* version is not cared */
     /* read all */
-    while(buf[0] != '\n' && buf[1] != '\n') { /* \n || \r\n */
+    int nlimit = 0;
+    while(buf[0] != '\n' && buf[1] != '\n' && nlimit < 20) { /* \n || \r\n */
+        // make sure accept standar header
+        if (buf[strlen(buf) -1] != '\n') break;
+
         rio_readlineb(&rio, buf, MAXLINE);
+        // mlog(2, "[REQUEST] %s", buf);
         if(buf[0] == 'R' && buf[1] == 'a' && buf[2] == 'n'){
             sscanf(buf, "Range: bytes=%lu-%lu", &req->offset, &req->end);
             // Range: [start, end]
             if( req->end != 0) req->end ++;
+        } else if(buf[0] == 'C' && buf[1] == 'a' && buf[2] == 'c') {
+            sscanf(buf, "Cache-Control: %s", cache_control);
+            req->cache_control = cache_control;
+            if(strcmp(cache_control, "no-cache") == 0) req->refresh = 1;
+        } else if(buf[0] == 'H' && buf[1] == 'o' && buf[2] == 's') {
+            sscanf(buf, "Host: %s", host);
+            req->host = host;
         }
+        nlimit++;
     }
     char* filename = uri;
     if(uri[0] == '/'){
@@ -295,12 +348,24 @@ void parse_request(int fd, http_request *req){
             }
         }
     }
+
+    mlog(2, "[REQUEST] filename: %s", filename);
     url_decode(filename, req->filename, MAXLINE);
+
+    /* Auto index file */
+    if (filename[strlen(filename) - 1] == '/' || strcmp(filename, ".") == 0) {
+        char ifile[512];
+        sprintf(ifile, "%sindex.html", strcmp(filename, ".") == 0 ? "./" : filename);
+        if(access(ifile, F_OK) != -1) {
+            sprintf(req->filename, "%s", ifile);
+            mlog(1, "Auto Index File: %s", ifile);
+        }
+    }
 }
 
 
 void log_access(int status, struct sockaddr_in *c_addr, http_request *req){
-    printf("%s:%d %d - %s\n", inet_ntoa(c_addr->sin_addr),
+    mlog(1, "[ACCESS] %s:%d %d - %s", inet_ntoa(c_addr->sin_addr),
            ntohs(c_addr->sin_port), status, req->filename);
 }
 
@@ -313,18 +378,53 @@ void client_error(int fd, int status, char *msg, char *longmsg){
     writen(fd, buf, strlen(buf));
 }
 
+void serve_301(int out_fd, int in_fd, char* location) {
+    char buf[256];
+    sprintf(buf, "HTTP/1.1 301 Moved Permanently\r\n");
+    sprintf(buf + strlen(buf), "Location: %s\r\n", location);
+    writen(out_fd, buf, strlen(buf));
+    close(out_fd);
+    mlog(4, "http 301 moved permanently: %s.", location);
+}
+
+char *mimetype_not_support = ".flv, .mkv, .avi, .wmv";
 void serve_static(int out_fd, int in_fd, http_request *req,
                   size_t total_size){
+
+    // open file with xdg-open and send status 403 if not support
+    if (strstr(mimetype_not_support, strrchr(req->filename, '.')) != NULL) {
+        client_error(out_fd, 403, "Forbidden", "Mime Type Not Support.");
+        char cmd[256];
+        sprintf(cmd, "xdg-open \"%s\" &", req->filename);
+        if (system(cmd) == -1) {
+            mlog(4, "system call error");
+        }
+        close(out_fd);
+        return ;
+    }
+
     char buf[256];
     if (req->offset > 0){
         sprintf(buf, "HTTP/1.1 206 Partial\r\n");
         sprintf(buf + strlen(buf), "Content-Range: bytes %lu-%lu/%lu\r\n",
-                req->offset, req->end, total_size);
+                req->offset, req->end - 1, total_size);
     } else {
         sprintf(buf, "HTTP/1.1 200 OK\r\nAccept-Ranges: bytes\r\n");
     }
     sprintf(buf + strlen(buf), "Cache-Control: no-cache\r\n");
     // sprintf(buf + strlen(buf), "Cache-Control: public, max-age=315360000\r\nExpires: Thu, 31 Dec 2037 23:55:55 GMT\r\n");
+
+    /*
+     * char *date= now_rfc();
+     * sprintf(buf + strlen(buf), "Date: %s\r\n",
+     *         rfctime_now());
+     * free(date);
+     *
+     * char *last_modified = get_fmtime(req->filename);
+     * sprintf(buf + strlen(buf), "Last-Modified: %s\r\n",
+     *         last_modified);
+     * free(last_modified)
+     */
 
     sprintf(buf + strlen(buf), "Content-length: %lu\r\n",
             req->end - req->offset);
@@ -332,21 +432,23 @@ void serve_static(int out_fd, int in_fd, http_request *req,
             get_mime_type(req->filename));
 
     writen(out_fd, buf, strlen(buf));
-    off_t offset = req->offset; /* copy */
+    off_t offset = req->offset;
     while(offset < req->end){
         if(sendfile(out_fd, in_fd, &offset, req->end - req->offset) <= 0) {
             break;
         }
-        printf("offset: %d \n\n", offset);
+        mlog(1, "offset: %ld", offset);
         close(out_fd);
         break;
     }
 }
 
 void process(int fd, struct sockaddr_in *clientaddr){
-    printf("accept request, fd is %d, pid is %d\n", fd, getpid());
+    mlog(2, "[PROCESS] accept request, fd is %d, pid is %d", fd, getpid());
     http_request req;
     parse_request(fd, &req);
+
+    mlog(1, "[HEADER] f:%s, h:%s, c:%s, r:%d", req.filename, req.host, req.cache_control, req.refresh);
 
     struct stat sbuf;
     int status = 200, ffd = open(req.filename, O_RDONLY, 0);
@@ -365,8 +467,15 @@ void process(int fd, struct sockaddr_in *clientaddr){
             }
             serve_static(fd, ffd, &req, sbuf.st_size);
         } else if(S_ISDIR(sbuf.st_mode)){
-            status = 200;
-            handle_directory_request(fd, ffd, req.filename);
+            char lc = req.filename[strlen(req.filename) - 1];
+            if (lc != '/' && lc != '.') {
+                char dfile[512];
+                sprintf(dfile, "/%s/", req.filename);
+                serve_301(fd, ffd, dfile);
+            } else {
+                status = 200;
+                handle_directory_request(fd, ffd, &req);
+            }
         } else {
             status = 400;
             char *msg = "Unknow Error";
@@ -404,9 +513,12 @@ int main(int argc, char** argv){
         }
     }
 
+    ROOT = path;
+    mlog(2, "[ROOT]: %s", path);
+
     listenfd = open_listenfd(default_port);
     if (listenfd > 0) {
-        printf("listen on port %d, fd is %d\n", default_port, listenfd);
+        mlog(2, "listen on port %d, fd is %d", default_port, listenfd);
     } else {
         perror("ERROR");
         exit(listenfd);
@@ -424,7 +536,7 @@ int main(int argc, char** argv){
                 close(connfd);
             }
         } else if (pid > 0) {   //  parent
-            printf("child pid is %d\n", pid);
+            // mlog(1, "child pid is %d\n", pid);
         } else {
             perror("fork");
         }
