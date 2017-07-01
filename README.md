@@ -8,6 +8,13 @@ Install
 git clone https://github.com/liangguohuan/tiny-web-server.git
 make install
 ```
+
+Uninstall
+-------
+```sh
+make uninstall
+```
+
 Usage
 -------
 tinyserver [dir] [port] ...
