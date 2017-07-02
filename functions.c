@@ -15,13 +15,13 @@ void mlog(int level, const char *format, ...) {
     char *tag;
     char color[12];
     switch (level) {
-        case 0: tag = "TRAC"  ; break ;
+        case 0: tag = "TRAC*" ; break ;
         case 1: tag = "DEBUG" ; break ;
-        case 2: tag = "INFO"  ; break ;
-        case 3: tag = "WARN"  ; break ;
+        case 2: tag = "INFO*" ; break ;
+        case 3: tag = "WARN*" ; break ;
         case 4: tag = "ERROR" ; break ;
         case 5: tag = "FATAL" ; break ;
-        case 6: tag = "ALL"   ; break ;
+        case 6: tag = "ALL**" ; break ;
         default: break        ;
     }
     sprintf(color, "\x1b[38;5;%dm", level);
@@ -35,12 +35,11 @@ void mlog(int level, const char *format, ...) {
     fprintf(stdout, "\n");
 }
 
-int file_exists (char * fileName)
+int file_exists (char *fileName)
 {
     struct stat buf;
-    int i = stat ( fileName, &buf );
-    if ( i == 0 )
-    {
+    int i = stat(fileName, &buf);
+    if (i == 0) {
         return 1;
     }
     return 0;
@@ -136,27 +135,25 @@ double time_nanos() {
 
 char *read_file(char *filename)
 {
-   char *buffer = NULL;
-   int string_size, read_size;
-   FILE *handler = fopen(filename, "r");
+    char *buffer = NULL;
+    int string_size, read_size;
+    FILE *handler = fopen(filename, "r");
 
-   if (handler)
-   {
-       fseek(handler, 0, SEEK_END);
-       string_size = ftell(handler);
-       rewind(handler);
+    if (handler) {
+        fseek(handler, 0, SEEK_END);
+        string_size = ftell(handler);
+        rewind(handler);
 
-       buffer = (char*) malloc(sizeof(char) * (string_size + 1) );
-       read_size = fread(buffer, sizeof(char), string_size, handler);
-       buffer[string_size] = '\0';
+        buffer = (char*) malloc(sizeof(char) * (string_size + 1) );
+        read_size = fread(buffer, sizeof(char), string_size, handler);
+        buffer[string_size] = '\0';
 
-       if (string_size != read_size)
-       {
-           free(buffer);
-           buffer = NULL;
-       }
+        if (string_size != read_size) {
+            free(buffer);
+            buffer = NULL;
+        }
 
-       fclose(handler);
+        fclose(handler);
     }
     return buffer;
 }
@@ -172,8 +169,7 @@ char *join(const char *s1, const char *s2)
 {
     char *result = malloc(strlen(s1) + strlen(s2) + 1);
 
-    if (result)
-    {
+    if (result) {
         strcpy(result, s1);
         strcat(result, s2);
     }
@@ -218,4 +214,13 @@ char *str_replace(char *orig, char *rep, char *with) {
     }
     strcpy(tmp, orig);
     return result;
+}
+
+int in_array(char *elements[], char *element, size_t size) {
+    for (int i = 0; i < size; i++) {
+        if (strcmp(element, elements[i]) == 0) {
+            return i;
+        }
+    }
+    return -1;
 }

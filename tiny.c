@@ -34,6 +34,8 @@ int openat(int dirfd, const char *pathname, int flags, ...);
 #define MAXLINE 1024   /* max length of a line */
 #define RIO_BUFSIZE 1024
 #define HOME getenv("HOME")
+#define CONF_PATH ".config/tinyserver"
+#define CACHE_PATH CONF_PATH"/cache"
 
 /*--------------------------------------------------------------------------
 | struct define
@@ -183,8 +185,8 @@ void handle_directory_request(int out_fd, int dir_fd, http_request *req){
     sprintf(cachename, "%s/%s", ROOT, req->filename);
     url_encode(cachename_encode, cachename);
 
-    sprintf(cachefile, "%s/.config/tinyserver/cache/%s", HOME, cachename_encode);
-    sprintf(templatefile, "%s/.config/tinyserver/%s", HOME, "dir.template.html");
+    sprintf(cachefile, "%s/%s/%s", HOME, CACHE_PATH, cachename_encode);
+    sprintf(templatefile, "%s/%s/%s", HOME, CONF_PATH, "dir.template.html");
 
     mlog(1, "cachefile: %s", cachefile);
     mlog(1, "templatefile: %s", templatefile);
@@ -391,8 +393,9 @@ char *mimetype_not_support = ".flv, .mkv, .avi, .wmv";
 void serve_static(int out_fd, int in_fd, http_request *req,
                   size_t total_size){
 
+    char *extname = strrchr(req->filename, '.');
     // open file with xdg-open and send status 403 if not support
-    if (strstr(mimetype_not_support, strrchr(req->filename, '.')) != NULL) {
+    if (extname != NULL && strstr(mimetype_not_support, extname) != NULL) {
         client_error(out_fd, 403, "Forbidden", "Mime Type Not Support.");
         char cmd[256];
         sprintf(cmd, "xdg-open \"%s\" &", req->filename);
@@ -434,6 +437,7 @@ void serve_static(int out_fd, int in_fd, http_request *req,
     writen(out_fd, buf, strlen(buf));
     off_t offset = req->offset;
     while(offset < req->end){
+        mlog(2, "start send file to client");
         if(sendfile(out_fd, in_fd, &offset, req->end - req->offset) <= 0) {
             break;
         }
@@ -477,6 +481,7 @@ void process(int fd, struct sockaddr_in *clientaddr){
                 handle_directory_request(fd, ffd, &req);
             }
         } else {
+            mlog(1, "Handle Unknow Error");
             status = 400;
             char *msg = "Unknow Error";
             client_error(fd, status, "Error", msg);
@@ -514,7 +519,7 @@ int main(int argc, char** argv){
     }
 
     ROOT = path;
-    mlog(2, "[ROOT]: %s", path);
+    mlog(2, "[ROOT] %s", path);
 
     listenfd = open_listenfd(default_port);
     if (listenfd > 0) {
