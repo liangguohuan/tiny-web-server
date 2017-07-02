@@ -17,6 +17,7 @@ char *get_fmtime(char *filePath);
 char *now_rfc();
 long now();
 double time_nanos();
+/* call free() after unsed */
 char *read_file(char *filename);
 void write_file(char *filename, char *content, char *mode);
 /* call free() after unsed */

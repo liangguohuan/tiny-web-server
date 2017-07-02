@@ -199,8 +199,9 @@ void handle_directory_request(int out_fd, int dir_fd, http_request *req){
 
     // read from cache
     if (req->refresh == 0 && file_exists(cachefile)) {
-        char *cache = read_file(cachefile);
-        writen(out_fd, cache, strlen(cache));
+        char *cache_content = read_file(cachefile);
+        writen(out_fd, cache_content, strlen(cache_content));
+        free(cache_content);
         mlog(1, "%s", "[CACHE] load cache file.");
         return ;
     }
