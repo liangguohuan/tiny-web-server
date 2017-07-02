@@ -1,1 +1,96 @@
-<!DOCTYPE html> <html> <head> <meta http-equiv="content-type" content="text/html;charset=utf-8"> <style> body { font-family: monospace; font-size: 13px; } a { text-decoration: none; font-size: 13px; } tr>td:nth-child(1n+2) { text-align: center; } .dataTables_wrapper { margin-top: 15px; } </style> <link rel='stylesheet' type='text/css' href='http://cdn.datatables.net/1.10.15/css/jquery.dataTables.min.css'> <script type='text/javascript' language='javascript' src='https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js'> </script> <script type='text/javascript' language='javascript' src='http://cdn.datatables.net/1.10.15/js/jquery.dataTables.min.js'> </script> <script type='text/javascript' language='javascript'> var data = [ {{data}} ]; </script> <script type='text/javascript' class='init'> $(document).ready(function() { $('table').DataTable({ data: data, 'pageLength': 16, 'lengthMenu': [ [16, 25, 50, -1], [16, 25, 50, 'All'] ], 'columnDefs': [{ 'targets': [3], 'visible': false }, { 'targets': [2], orderData: [3] }] }); }); </script> </head> <body> <table id='example' class='display' cellspacing='0' width='100%'> <thead> <tr> <th>Name</th> <th>Date</th> <th>Size</th> <th>OrderSize</th> </tr> </thead> <tfoot> <tr> <th></th> <th></th> <th></th> <th></th> </tr> </tfoot> </table> </body> </html>
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="content-type" content="text/html;charset=utf-8">
+    <style>
+        body {
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        a {
+            text-decoration: none;
+            font-size: 13px;
+        }
+
+        tr>td:nth-child(1n+2) {
+            text-align: center;
+        }
+
+        .dataTables_wrapper {
+            margin-top: 15px;
+        }
+    </style>
+    <link rel='stylesheet' type='text/css' href='http://cdn.datatables.net/1.10.15/css/jquery.dataTables.min.css'>
+    <script type='text/javascript' language='javascript' src='https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js'>
+    </script>
+    <script type='text/javascript' language='javascript' src='http://cdn.datatables.net/1.10.15/js/jquery.dataTables.min.js'>
+    </script>
+    <script type='text/javascript' language='javascript'>
+        var data = [{{data}}];
+    </script>
+    <script type='text/javascript' class='init'>
+        jQuery.extend(jQuery.fn.dataTableExt.oSort, {
+            "directory-asc": function(a, b) {
+                return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+            },
+
+            "directory-desc": function(a, b) {
+                return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+            }
+        });
+
+        $(document).ready(function() {
+            $('table').DataTable({
+                data: data,
+                'pageLength': 16,
+                'lengthMenu': [
+                    [16, 25, 50, -1],
+                    [16, 25, 50, 'All']
+                ],
+                'columnDefs': [{
+                    'targets': [3, 4],
+                    'visible': false
+                }, {
+                    "sType": "directory",
+                    "aTargets": [4]
+                }, {
+                    'targets': [0],
+                    orderData: [4, 0]
+                }, {
+                    'targets': [1],
+                    orderData: [4, 1]
+                }, {
+                    'targets': [2],
+                    orderData: [4, 3]
+                }]
+            });
+        });
+    </script>
+</head>
+
+<body>
+    <table id='example' class='display' cellspacing='0' width='100%'>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Date</th>
+                <th>Size</th>
+                <th>OrderSize</th>
+                <th>Type</th>
+            </tr>
+        </thead>
+        <tfoot>
+            <tr>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+            </tr>
+        </tfoot>
+    </table>
+</body>
+
+</html>

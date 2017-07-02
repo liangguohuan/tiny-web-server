@@ -9,8 +9,7 @@ tiny: tiny.c
 	install -d $(CONFIG_DIR)
 	install -d $(CONFIG_DIR)/cache
 	install -m 664 dir.template.html $(CONFIG_DIR)/dir.template.html
-	$(CC) $(CFLAGS) -o tiny *.c
-	sudo install -m 775 tiny $(BINFILE)
+	sudo $(CC) $(CFLAGS) -o $(BINFILE) *.c
 
 check:
 	rm -f *.o tiny *~

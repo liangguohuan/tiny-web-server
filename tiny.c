@@ -226,8 +226,8 @@ void handle_directory_request(int out_fd, int dir_fd, http_request *req){
         if(S_ISREG(statbuf.st_mode) || S_ISDIR(statbuf.st_mode)){
             char *d = S_ISDIR(statbuf.st_mode) ? "/" : "";
             char *dattr = S_ISDIR(statbuf.st_mode) ? "data-dir" : "data-file";
-            sprintf(buf, "[\"<a %s href=\\\"%s%s\\\">%s%s</a>\", \"%s\", \"%s\", \"%ld\"],",
-                    dattr, dp->d_name, d, dp->d_name, d, m_time, size, (long)statbuf.st_size);
+            sprintf(buf, "[\"<a %s href=\\\"%s%s\\\">%s%s</a>\", \"%s\", \"%s\", \"%ld\", \"%d\"],",
+                    dattr, dp->d_name, d, dp->d_name, d, m_time, size, (long)statbuf.st_size, S_ISDIR(statbuf.st_mode) ? 0 : 1);
             data = join(data, buf);
         }
         close(ffd);
