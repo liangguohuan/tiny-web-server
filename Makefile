@@ -2,28 +2,38 @@ CC = gcc
 CFLAGS = -Wall -O2
 CONFIG_DIR=~/.config/tinyserver
 BINFILE=/usr/local/bin/tinyserver
+TARGET=tinyserver
 
-all: tiny
+.PHONY: all
+all: install
 
-tiny: tiny.c
+.PHONY: $(TARGET)
+$(TARGET): 
+	$(CC) $(CFLAGS) -o $@.o *.c
+
+.PHONY: config
+config:
 	install -d $(CONFIG_DIR)
 	install -d $(CONFIG_DIR)/cache
 	install -m 664 dir.template.html $(CONFIG_DIR)/dir.template.html
-	sudo $(CC) $(CFLAGS) -o $(BINFILE) *.c
 
+.PHONY: check
 check:
-	rm -f *.o tiny *~
-	$(CC) $(CFLAGS) -o tiny *.c
+	rm -f *.o *~
+	$(CC) $(CFLAGS) -o $(TARGET).o *.c
 
+.PHONY: clean
 clean:
-	rm -f *.o tiny *~
+	rm -f *.o *~
+
+.PHONY: install
+install: clean config all
+	sudo cp $(TARGET).o $(BINFILE)
+
+.PHONY: uninstall
+uninstall: clean
 	rm -rf $(CONFIG_DIR)
-
-install:
-	make clean
-	make all
-
-uninstall:
-	make clean
 	sudo rm -rf $(BINFILE)
 
+*.o: *.c
+	$(CC) $(CFLAGS) -o $@ -c $<
