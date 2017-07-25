@@ -1,39 +1,43 @@
 CC = gcc
 CFLAGS = -Wall -O2
-CONFIG_DIR=~/.config/tinyserver
-BINFILE=/usr/local/bin/tinyserver
 TARGET=tinyserver
+SRC=functions.c tiny.c
+OBJS=$(SRC:.c=.o)
+CONFIG_DIR=~/.config/$(TARGET)
+BINFILE=/usr/local/bin/$(TARGET)
+LOGNAME=$(shell echo $(HOME) | cut -d / -f3)
 
 .PHONY: all
 all: install
 
 .PHONY: $(TARGET)
-$(TARGET): 
-	$(CC) $(CFLAGS) -o $@.o *.c
+$(TARGET): $(OBJS) 
+	$(CC) $(CFLAGS) -o $@ $^
 
 .PHONY: config
 config:
-	install -d $(CONFIG_DIR)
-	install -d $(CONFIG_DIR)/cache
-	install -m 664 dir.template.html $(CONFIG_DIR)/dir.template.html
+	install -g $(LOGNAME) -o $(LOGNAME) -d $(CONFIG_DIR)
+	install -g $(LOGNAME) -o $(LOGNAME) -d $(CONFIG_DIR)/cache
+	install -g $(LOGNAME) -o $(LOGNAME) -m 664 dir.template.html $(CONFIG_DIR)/dir.template.html
 
 .PHONY: check
-check:
-	rm -f *.o *~
-	$(CC) $(CFLAGS) -o $(TARGET).o *.c
+check: clean $(TARGET)
+
+.PHONY: test
+test: check
 
 .PHONY: clean
 clean:
-	rm -f *.o *~
+	rm -f *.o *~ $(TARGET) $(OBJS)
 
 .PHONY: install
-install: clean config all
-	sudo cp $(TARGET).o $(BINFILE)
+install: clean config all $(TARGET)
+	install -g $(LOGNAME) -o $(LOGNAME) $(TARGET) $(BINFILE)
 
 .PHONY: uninstall
 uninstall: clean
 	rm -rf $(CONFIG_DIR)
-	sudo rm -rf $(BINFILE)
+	rm -rf $(BINFILE)
 
-*.o: *.c
+%.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $<

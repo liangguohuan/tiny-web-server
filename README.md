@@ -6,13 +6,13 @@ Install
 -------
 ```sh
 git clone https://github.com/liangguohuan/tiny-web-server.git
-make install
+sudo make install
 ```
 
 Uninstall
 -------
 ```sh
-make uninstall
+sudo make uninstall
 ```
 
 Usage
@@ -21,7 +21,7 @@ tinyserver [dir] [port] ...
 
 New Feature
 -------
-- auto add slash if request is dir
+- auto add slash and send status 301 if request is dir
 - auto index file index.html 
 - use dataTables to show files friendly if request is dir
 - more commands in Makefile
@@ -48,8 +48,6 @@ Change Logs
 * 2017-06-25 auto add slash if request is dir  
 * 2017-06-25 add auto index file feture  
 
--------
--------
 -------
 
 A tiny web server in C
