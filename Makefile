@@ -12,7 +12,7 @@ all: install
 
 .PHONY: $(TARGET)
 $(TARGET): $(OBJS) 
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@.o $^
 
 .PHONY: config
 config:
@@ -31,8 +31,8 @@ clean:
 	rm -f *.o *~ $(TARGET) $(OBJS)
 
 .PHONY: install
-install: clean config all $(TARGET)
-	install -g $(LOGNAME) -o $(LOGNAME) $(TARGET) $(BINFILE)
+install: clean config $(TARGET)
+	install $(TARGET).o $(BINFILE)
 
 .PHONY: uninstall
 uninstall: clean
