@@ -5,17 +5,23 @@
 // @description  try to take over the world!
 // @author       You
 // @include      http://localhost:9999/*
-// @grant         none
+// @grant        none
 // @require https://cdn.bootcss.com/fancybox/3.1.20/jquery.fancybox.js
 // ==/UserScript==
 
 var videos = ['.flv', '.mkv', '.avi', '.wmv'];
 var images = ['.jpg', '.jpeg', '.png', '.git'];
+var styleText = `
+<style>
+video {width: 100%}
+.fancybox-slide--iframe .fancybox-content {width: 928px;}
+</style>
+`;
 
 (function() {
     'use strict';
     $('head').append('<link  href="https://cdn.bootcss.com/fancybox/3.1.20/jquery.fancybox.css" rel="stylesheet">');
-    $('head').append('<style>.fancybox-slide--iframe .fancybox-content {width: 920px;}</style>');
+    $('head').append(styleText);
     $(document).on('beforeShow.fb', function(e, instance) {
         var src = instance.$lastFocus["0"].innerText;
         if (videos.indexOf(src.slice(-4)) !== -1) {
